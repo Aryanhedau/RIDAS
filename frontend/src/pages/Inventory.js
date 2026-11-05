@@ -1,6 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../config';
 
+const emptyForm = {
+  name: '',
+  sku: '',
+  category_id: '',
+  price: '',
+  cost: '',
+  current_stock: '',
+  reorder_threshold: '',
+  expiry_date: '',
+  description: ''
+};
+
+const labelStyle = {
+  fontSize: '13px',
+  fontWeight: '600',
+  color: '#334155',
+  marginBottom: '4px',
+  display: 'block'
+};
+
+const inputStyle = {
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: '6px',
+  border: '2px solid #cbd5e1',
+  fontSize: '14px',
+  outline: 'none',
+  fontFamily: 'inherit',
+  boxSizing: 'border-box',
+  backgroundColor: '#ffffff'
+};
+
 export default function Inventory() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -8,6 +40,13 @@ export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Add product state
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newProduct, setNewProduct] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   useEffect(() => {
     fetchCategoriesAndProducts();
@@ -84,6 +123,79 @@ export default function Inventory() {
     }
   };
 
+  // ============================================
+  // ADD PRODUCT
+  // ============================================
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setNewProduct((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleAddProduct = async (e) => {
+    e.preventDefault();
+    setFormError(null);
+    setSuccessMessage(null);
+
+    // Basic check before sending to the server
+    if (
+      !newProduct.name.trim() ||
+      !newProduct.sku.trim() ||
+      !newProduct.category_id ||
+      newProduct.price === '' ||
+      newProduct.current_stock === '' ||
+      newProduct.reorder_threshold === '' ||
+      !newProduct.expiry_date
+    ) {
+      setFormError('Please fill in all required fields (marked with *).');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/api/products`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: newProduct.name,
+          sku: newProduct.sku,
+          category_id: newProduct.category_id,
+          price: newProduct.price,
+          cost: newProduct.cost,
+          current_stock: newProduct.current_stock,
+          reorder_threshold: newProduct.reorder_threshold,
+          expiry_date: newProduct.expiry_date,
+          description: newProduct.description
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setFormError(data.error || `Server error (HTTP ${response.status})`);
+        return;
+      }
+
+      setSuccessMessage(`✅ Product "${data.name}" (${data.sku}) was added successfully.`);
+      setNewProduct(emptyForm);
+      setShowAddForm(false);
+      await fetchProducts();
+    } catch (err) {
+      console.error('Add product error:', err);
+      setFormError('Could not reach the server: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ============================================
+  // FILTERING AND GROUPING
+  // ============================================
+
   // Filter products by category and search
   const filteredProducts = products.filter((product) => {
     const matchesCategory =
@@ -150,6 +262,176 @@ export default function Inventory() {
           </p>
         </div>
 
+        {/* Success Message */}
+        {successMessage && (
+          <div style={{ padding: '14px 20px', backgroundColor: '#dcfce7', color: '#15803d', borderRadius: '8px', marginBottom: '20px', borderLeft: '4px solid #16a34a', fontWeight: '500' }}>
+            {successMessage}
+          </div>
+        )}
+
+        {/* Add Product Form */}
+        {showAddForm && (
+          <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#0f172a', margin: '0 0 6px 0' }}>
+              ➕ Add New Product
+            </h2>
+            <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 18px 0' }}>
+              Fields marked with * are required.
+            </p>
+
+            <form onSubmit={handleAddProduct}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '16px' }}>
+
+                <div>
+                  <label style={labelStyle}>Product Name *</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={newProduct.name}
+                    onChange={handleFormChange}
+                    placeholder="e.g., Maggi Noodles 70g"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>SKU * (unique code)</label>
+                  <input
+                    type="text"
+                    name="sku"
+                    value={newProduct.sku}
+                    onChange={handleFormChange}
+                    placeholder="e.g., SKU101"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Category *</label>
+                  <select
+                    name="category_id"
+                    value={newProduct.category_id}
+                    onChange={handleFormChange}
+                    style={{ ...inputStyle, cursor: 'pointer' }}
+                  >
+                    <option value="">-- Select category --</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Expiry Date *</label>
+                  <input
+                    type="date"
+                    name="expiry_date"
+                    value={newProduct.expiry_date}
+                    onChange={handleFormChange}
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Price (₹) *</label>
+                  <input
+                    type="number"
+                    name="price"
+                    value={newProduct.price}
+                    onChange={handleFormChange}
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Cost (₹) - optional</label>
+                  <input
+                    type="number"
+                    name="cost"
+                    value={newProduct.cost}
+                    onChange={handleFormChange}
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Stock Quantity *</label>
+                  <input
+                    type="number"
+                    name="current_stock"
+                    value={newProduct.current_stock}
+                    onChange={handleFormChange}
+                    min="0"
+                    step="1"
+                    placeholder="0"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Reorder Level *</label>
+                  <input
+                    type="number"
+                    name="reorder_threshold"
+                    value={newProduct.reorder_threshold}
+                    onChange={handleFormChange}
+                    min="0"
+                    step="1"
+                    placeholder="e.g., 10"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={labelStyle}>Description - optional</label>
+                  <textarea
+                    name="description"
+                    value={newProduct.description}
+                    onChange={handleFormChange}
+                    rows={2}
+                    placeholder="Short description of the product"
+                    style={{ ...inputStyle, resize: 'vertical' }}
+                  />
+                </div>
+              </div>
+
+              {/* Form Error */}
+              {formError && (
+                <div style={{ marginTop: '16px', padding: '12px 16px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '6px', borderLeft: '4px solid #dc2626', fontSize: '14px' }}>
+                  <strong>⚠️ Error:</strong> {formError}
+                </div>
+              )}
+
+              {/* Form Buttons */}
+              <div style={{ display: 'flex', gap: '12px', marginTop: '20px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddForm(false); setFormError(null); setNewProduct(emptyForm); }}
+                  disabled={saving}
+                  style={{ padding: '10px 20px', borderRadius: '6px', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  style={{ padding: '10px 20px', borderRadius: '6px', backgroundColor: saving ? '#94a3b8' : '#16a34a', border: 'none', color: '#ffffff', cursor: saving ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '14px' }}
+                >
+                  {saving ? 'Saving...' : 'Save Product'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
         {/* Filter Toolbar */}
         <div style={{
           display: 'flex', gap: '16px', flexWrap: 'wrap',
@@ -209,6 +491,23 @@ export default function Inventory() {
               ✕ Reset
             </button>
           )}
+
+          {/* Add Product Button */}
+          <button
+            onClick={() => {
+              setShowAddForm((prev) => !prev);
+              setFormError(null);
+              setSuccessMessage(null);
+            }}
+            style={{
+              padding: '10px 18px', borderRadius: '6px',
+              backgroundColor: showAddForm ? '#64748b' : '#2563eb',
+              border: 'none', color: '#ffffff', cursor: 'pointer',
+              fontWeight: '600', fontSize: '14px', whiteSpace: 'nowrap'
+            }}
+          >
+            {showAddForm ? '✕ Close Form' : '➕ Add Product'}
+          </button>
         </div>
 
         {/* Loading State */}
@@ -271,7 +570,9 @@ export default function Inventory() {
                               <td style={{ padding: '12px 16px', fontWeight: '500', color: '#0f172a' }}>{prod.name}</td>
                               <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '12px', fontFamily: 'monospace' }}>{prod.sku}</td>
                               <td style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'right' }}>₹{Number(prod.price).toFixed(2)}</td>
-                              <td style={{ padding: '12px 16px', color: '#64748b', textAlign: 'right' }}>₹{Number(prod.cost).toFixed(2)}</td>
+                              <td style={{ padding: '12px 16px', color: '#64748b', textAlign: 'right' }}>
+                                {prod.cost !== null && prod.cost !== undefined ? `₹${Number(prod.cost).toFixed(2)}` : 'N/A'}
+                              </td>
                               <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: prod.current_stock <= prod.reorder_threshold ? 'bold' : '500', color: prod.current_stock <= prod.reorder_threshold ? '#dc2626' : '#0f172a' }}>{prod.current_stock}</td>
                               <td style={{ padding: '12px 16px', textAlign: 'center', color: '#64748b' }}>{prod.reorder_threshold}</td>
                               <td style={{ padding: '12px 16px', textAlign: 'center' }}>

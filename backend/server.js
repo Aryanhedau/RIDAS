@@ -169,6 +169,126 @@ app.get('/api/products/:id', verifyToken, async (req, res) => {
 });
 
 // ============================================
+// ADD PRODUCT (PROTECTED)
+// ============================================
+
+app.post('/api/products', verifyToken, async (req, res) => {
+  try {
+    const {
+      name,
+      sku,
+      category_id,
+      price,
+      cost,
+      current_stock,
+      reorder_threshold,
+      expiry_date,
+      description
+    } = req.body;
+
+    const toNumber = (value) =>
+      value === '' || value === null || value === undefined ? NaN : Number(value);
+
+    const cleanName = typeof name === 'string' ? name.trim() : '';
+    const cleanSku = typeof sku === 'string' ? sku.trim().toUpperCase() : '';
+    const expiry = typeof expiry_date === 'string' ? expiry_date.trim() : '';
+    const cleanDescription =
+      typeof description === 'string' && description.trim() !== '' ? description.trim() : null;
+
+    const categoryId = toNumber(category_id);
+    const priceNum = toNumber(price);
+    const costNum = cost === '' || cost === null || cost === undefined ? null : Number(cost);
+    const stockNum = toNumber(current_stock);
+    const reorderNum = toNumber(reorder_threshold);
+
+    // Required fields
+    if (!cleanName || !cleanSku || !expiry || Number.isNaN(categoryId)) {
+      return res.status(400).json({ error: 'Name, SKU, category and expiry date are required' });
+    }
+
+    // Number checks
+    if (!Number.isInteger(categoryId)) {
+      return res.status(400).json({ error: 'Category is invalid' });
+    }
+    if (Number.isNaN(priceNum) || priceNum < 0) {
+      return res.status(400).json({ error: 'Price must be a number, 0 or more' });
+    }
+    if (costNum !== null && (Number.isNaN(costNum) || costNum < 0)) {
+      return res.status(400).json({ error: 'Cost must be a number, 0 or more' });
+    }
+    if (!Number.isInteger(stockNum) || stockNum < 0) {
+      return res.status(400).json({ error: 'Stock quantity must be a whole number, 0 or more' });
+    }
+    if (!Number.isInteger(reorderNum) || reorderNum < 0) {
+      return res.status(400).json({ error: 'Reorder level must be a whole number, 0 or more' });
+    }
+
+    // Date check (YYYY-MM-DD)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expiry) || Number.isNaN(Date.parse(expiry))) {
+      return res.status(400).json({ error: 'Expiry date must be in YYYY-MM-DD format' });
+    }
+
+    // Category must exist
+    const categoryCheck = await pool.query('SELECT id FROM categories WHERE id = $1', [categoryId]);
+    if (categoryCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Selected category does not exist' });
+    }
+
+    // SKU must be unique
+    const skuCheck = await pool.query('SELECT id FROM products WHERE sku = $1', [cleanSku]);
+    if (skuCheck.rows.length > 0) {
+      return res.status(409).json({ error: `SKU ${cleanSku} already exists` });
+    }
+
+    const insert = await pool.query(`
+      INSERT INTO products
+        (name, sku, category_id, price, cost, current_stock, reorder_threshold,
+         expiry_date, description, is_active, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NOW(), NOW())
+      RETURNING id
+    `, [
+      cleanName,
+      cleanSku,
+      categoryId,
+      priceNum,
+      costNum,
+      stockNum,
+      reorderNum,
+      expiry,
+      cleanDescription
+    ]);
+
+    const newId = insert.rows[0].id;
+
+    const result = await pool.query(`
+      SELECT
+        p.id,
+        p.name,
+        p.sku,
+        p.category_id,
+        c.name as category_name,
+        p.price,
+        p.cost,
+        p.current_stock,
+        p.reorder_threshold,
+        p.expiry_date,
+        p.is_active
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.id = $1
+    `, [newId]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'SKU already exists' });
+    }
+    console.error('Add product error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
 // INVENTORY - LOW STOCK (PROTECTED)
 // ============================================
 
@@ -516,6 +636,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`  GET    /api/categories`);
   console.log(`  GET    /api/products`);
   console.log(`  GET    /api/products/:id`);
+  console.log(`  POST   /api/products`);
   console.log(`  GET    /api/inventory/low-stock`);
   console.log(`  GET    /api/inventory/expiring`);
   console.log(`  GET    /api/dashboard`);
