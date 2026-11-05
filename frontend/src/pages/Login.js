@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import '../styles/Login.css';
+import { API_BASE } from '../config';
 
 function Login({ onLogin }) {
   const [email, setEmail] = useState('admin@ridas.com');
@@ -14,7 +15,7 @@ function Login({ onLogin }) {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/auth/login', {
+      const response = await axios.post(`${API_BASE}/auth/login`, {
         email,
         password
       });

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 export default function Expiry() {
   const [expiredProducts, setExpiredProducts] = useState([]);
@@ -15,7 +16,7 @@ export default function Expiry() {
       setLoading(true);
       const token = localStorage.getItem('token');
 
-      const response = await fetch('http://localhost:5000/api/inventory/expiring', {
+      const response = await fetch(`${API_BASE}/api/inventory/expiring`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

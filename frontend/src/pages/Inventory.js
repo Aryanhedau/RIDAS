@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 export default function Inventory() {
   const [products, setProducts] = useState([]);
@@ -31,7 +32,7 @@ export default function Inventory() {
   const fetchCategories = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/categories', {
+      const response = await fetch(`${API_BASE}/api/categories`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -58,7 +59,7 @@ export default function Inventory() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/products', {
+      const response = await fetch(`${API_BASE}/api/products`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

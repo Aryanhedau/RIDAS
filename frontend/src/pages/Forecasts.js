@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './Forecasts.css';
+import { API_BASE } from '../config';
 
 export default function Forecasts() {
   const [products, setProducts] = useState([]);
@@ -12,7 +13,6 @@ export default function Forecasts() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const API_BASE = 'http://localhost:5000';
   const token = localStorage.getItem('token');
 
   // Load all products on mount
@@ -61,6 +61,7 @@ export default function Forecasts() {
   const fetchTopProducts = async () => {
     try {
       const response = await fetch(`${API_BASE}/api/ml/forecasts/top-products`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       setTopProducts(data.top_products || []);
     } catch (err) {
@@ -72,6 +73,7 @@ export default function Forecasts() {
   const fetchAccuracyStats = async () => {
     try {
       const response = await fetch(`${API_BASE}/api/ml/forecasts/accuracy-stats`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       setAccuracyStats(data);
     } catch (err) {
@@ -83,6 +85,7 @@ export default function Forecasts() {
   const fetchCategoryForecasts = async () => {
     try {
       const response = await fetch(`${API_BASE}/api/ml/forecasts/by-category`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       setCategoryForecasts(data.categories || []);
     } catch (err) {

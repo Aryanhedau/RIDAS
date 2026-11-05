@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 export default function Dashboard() {
   const [metrics, setMetrics] = useState({
@@ -20,7 +21,7 @@ export default function Dashboard() {
       setLoading(true);
       const token = localStorage.getItem('token');
 
-      const response = await fetch('http://localhost:5000/api/dashboard', {
+      const response = await fetch(`${API_BASE}/api/dashboard`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 export default function Insights() {
   const [insights, setInsights] = useState(null);
@@ -14,7 +15,7 @@ export default function Insights() {
       setLoading(true);
       const token = localStorage.getItem('token');
 
-      const response = await fetch('http://localhost:5000/api/insights/scale', {
+      const response = await fetch(`${API_BASE}/api/insights/scale`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
