@@ -1,0 +1,31 @@
+.insights h1 {
+  margin-bottom: 20px;
+}
+
+.tab-content {
+  background: white;
+  padding: 24px;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.insights-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.insights-table th,
+.insights-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.insights-table th {
+  background: #f8fafc;
+}
+
+.dead-stock-row {
+  background: #fff7ed;
+}

@@ -1,0 +1,95 @@
+const express = require('express');
+const { Pool } = require('pg');
+const cors = require('cors');
+require('dotenv').config();
+
+const app = express();
+
+// Database connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Test database connection
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error('Database connection error:', err);
+  } else {
+    console.log('Database connected successfully');
+  }
+});
+
+// Test route
+app.get('/', (req, res) => {
+  res.json({ message: 'RIDAS API is running!' });
+});
+
+// Get all products
+app.get('/api/products', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM products ORDER BY id');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get low stock items
+app.get('/api/inventory/low-stock', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT p.id, p.name, p.category, i.current_stock, i.reorder_threshold,
+             (i.reorder_threshold - i.current_stock) as shortage
+      FROM products p
+      JOIN inventory_levels i ON p.id = i.product_id
+      WHERE i.current_stock < i.reorder_threshold
+      ORDER BY shortage DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get product sales history
+app.get('/api/sales/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const result = await pool.query(
+      'SELECT * FROM sales_history WHERE product_id = $1 ORDER BY sale_date DESC',
+      [productId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get product associations (bundle recommendations)
+app.get('/api/recommendations/bundles/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const result = await pool.query(`
+      SELECT p.id, p.name, p.category, pa.confidence_score
+      FROM product_associations pa
+      JOIN products p ON (pa.product_b_id = p.id)
+      WHERE pa.product_a_id = $1
+      ORDER BY pa.confidence_score DESC
+    `, [productId]);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
