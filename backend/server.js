@@ -11,10 +11,21 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Middleware
+// ============================================
+// MIDDLEWARE
+// ============================================
+
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'https://ridas-frontend.onrender.com'
+];
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
-  credentials: true
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
@@ -25,18 +36,18 @@ app.use(express.json());
 app.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password required' });
     }
-    
+
     const token = jwt.sign(
       { email, role: 'admin' },
       process.env.JWT_SECRET || 'test-secret',
       { expiresIn: '24h' }
     );
-    
-    res.json({ 
+
+    res.json({
       message: 'Login successful',
       token,
       user: { email, role: 'admin' }
@@ -53,11 +64,11 @@ app.post('/auth/login', async (req, res) => {
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader ? authHeader.split(' ')[1] : null;
-  
+
   if (!token) {
     return res.status(401).json({ error: 'No token provided' });
   }
-  
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'test-secret');
     req.user = decoded;
@@ -146,7 +157,7 @@ app.get('/api/products/:id', verifyToken, async (req, res) => {
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.id = $1
     `, [id]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
@@ -194,11 +205,11 @@ app.get('/api/inventory/low-stock', verifyToken, async (req, res) => {
 app.get('/api/inventory/expiring', verifyToken, async (req, res) => {
   try {
     console.log('Fetching expiring products...');
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayStr = today.toISOString().split('T')[0];
-    
+
     const sevenDaysLater = new Date(today);
     sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
     const sevenDaysStr = sevenDaysLater.toISOString().split('T')[0];
@@ -335,7 +346,7 @@ app.get('/api/insights/scale', verifyToken, async (req, res) => {
       ORDER BY total_revenue DESC
       LIMIT 5
     `);
-    
+
     const deadStock = await pool.query(`
       SELECT 
         p.id, 
@@ -354,7 +365,7 @@ app.get('/api/insights/scale', verifyToken, async (req, res) => {
       HAVING MAX(s.sale_date) IS NULL OR CURRENT_DATE - MAX(s.sale_date) > 30
       ORDER BY days_since_sale DESC NULLS FIRST
     `);
-    
+
     const categoryPerf = await pool.query(`
       SELECT 
         c.name as category,
@@ -369,7 +380,7 @@ app.get('/api/insights/scale', verifyToken, async (req, res) => {
       GROUP BY c.name
       ORDER BY total_revenue DESC NULLS LAST
     `);
-    
+
     const metrics = await pool.query(`
       SELECT 
         COUNT(DISTINCT p.id) as total_products,
@@ -383,7 +394,7 @@ app.get('/api/insights/scale', verifyToken, async (req, res) => {
       LEFT JOIN sales s ON p.id = s.product_id
       WHERE p.is_active = TRUE
     `);
-    
+
     res.json({
       topProducts: topProducts.rows,
       deadStock: deadStock.rows,
@@ -431,17 +442,19 @@ app.get('/api/dashboard', verifyToken, async (req, res) => {
 
 // ============================================
 // ML FORECASTING ENDPOINTS (Flask Proxy)
+// Note: these call localhost:5001, which only exists on your computer.
+// On Render they return an error until the ML service is deployed.
 // ============================================
 
 app.get('/api/ml/forecast/:productId', async (req, res) => {
   try {
     const { productId } = req.params;
     const days = req.query.days || 7;
-    
+
     const response = await axios.get(
       `http://localhost:5001/api/ml/forecast/${productId}?days=${days}`
     );
-    
+
     res.json(response.data);
   } catch (error) {
     console.error('ML Forecast Error:', error.message);
@@ -492,10 +505,10 @@ app.use((req, res) => {
 // ============================================
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n✓ RIDAS API running on port ${PORT}`);
   console.log(`✓ Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
-  console.log(`✓ CORS: Enabled for localhost:3000`);
+  console.log(`✓ CORS: Enabled for ${allowedOrigins.join(', ')}`);
   console.log(`✓ Authentication: JWT enabled`);
   console.log(`✓ ML Proxy: Connected to Flask API (port 5001)\n`);
   console.log(`Available Endpoints:`);
